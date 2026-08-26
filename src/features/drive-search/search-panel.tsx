@@ -10,14 +10,19 @@ import type { DriveFile } from '@/types/api';
 export function SearchPanel() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<DriveFile[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!query.trim()) return;
     setBusy(true);
+    setError(null);
+    setResults(null);
     try {
       setResults(await searchDrive(query.trim()));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Search failed');
     } finally {
       setBusy(false);
     }
@@ -37,6 +42,7 @@ export function SearchPanel() {
           {busy ? 'Searching…' : 'Search'}
         </Button>
       </form>
+      {error && <p className="text-sm text-danger">{error}</p>}
       {results !== null && results.length === 0 && (
         <EmptyState
           title="No matching contracts found"

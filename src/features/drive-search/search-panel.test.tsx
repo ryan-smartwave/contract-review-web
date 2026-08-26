@@ -30,3 +30,14 @@ test('no matches shows graceful empty state', async () => {
     expect(screen.getByText(/no matching contracts found/i)).toBeInTheDocument(),
   );
 });
+
+test('search error displays error message and hides empty state', async () => {
+  searchDrive.mockRejectedValue(new Error('Request failed (500)'));
+  render(<SearchPanel />);
+  await userEvent.type(screen.getByRole('searchbox'), 'test');
+  await userEvent.click(screen.getByRole('button', { name: /search/i }));
+  await waitFor(() =>
+    expect(screen.getByText('Request failed (500)')).toBeInTheDocument(),
+  );
+  expect(screen.queryByText(/no matching contracts found/i)).not.toBeInTheDocument();
+});
