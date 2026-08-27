@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { CheckCircleIcon, UploadCloudIcon } from '@/components/ui/icons';
 import { uploadContract } from '@/lib/api';
 import type { DocumentOut } from '@/types/api';
 
@@ -15,7 +16,7 @@ export function UploadForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!file) return;
+    if (!file || busy) return;
     setBusy(true);
     setError(null);
     setResult(null);
@@ -35,9 +36,20 @@ export function UploadForm() {
           htmlFor="contract-file"
           className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed border-border px-6 py-10 text-center transition-colors hover:border-primary hover:bg-surface"
         >
+          <span className="mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <UploadCloudIcon />
+          </span>
           <span className="font-medium">Choose a contract (PDF or DOCX)</span>
           <span className="text-sm text-text-muted">
-            {file ? file.name : 'Click here to browse your files'}
+            {file ? (
+              <>
+                <span className="font-medium text-text">{file.name}</span>
+                {' · '}
+                {(file.size / 1024).toFixed(0)} KB
+              </>
+            ) : (
+              'Click here to browse your files'
+            )}
           </span>
         </label>
         <input
@@ -52,11 +64,24 @@ export function UploadForm() {
         </Button>
       </form>
       {result && (
-        <div className="mt-4 flex items-center gap-2">
-          <p className="text-sm">Received {result.filename}.</p>
-          <Badge tone={result.is_contract_revision ? 'success' : 'neutral'}>
-            {result.is_contract_revision ? 'Contract revision' : 'Not a contract revision'}
-          </Badge>
+        <div className="mt-4 rounded-lg bg-success/10 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-success">
+              <CheckCircleIcon />
+            </span>
+            <p className="text-sm font-medium">Received {result.filename}.</p>
+            <Badge tone={result.is_contract_revision ? 'success' : 'neutral'}>
+              {result.is_contract_revision ? 'Contract revision' : 'Not a contract revision'}
+            </Badge>
+            {result.confidence !== null && (
+              <span className="text-sm text-text-muted">
+                {Math.round(result.confidence * 100)}%
+              </span>
+            )}
+          </div>
+          {result.reasoning && (
+            <p className="mt-2 text-sm text-text-muted">{result.reasoning}</p>
+          )}
         </div>
       )}
       {error && <p className="mt-4 text-sm text-danger">{error}</p>}
