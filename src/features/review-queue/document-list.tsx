@@ -24,7 +24,9 @@ export function DocumentList({ documents }: { documents: DocumentOut[] }) {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                <p className="truncate font-medium">{doc.filename}</p>
+                <a href={'/documents/' + doc.id} className="truncate font-medium hover:underline">
+                  {doc.filename}
+                </a>
                 <div className="flex shrink-0 items-center gap-2">
                   {doc.is_contract_revision === null ? (
                     <Badge tone="warning">Classifying…</Badge>
@@ -40,6 +42,9 @@ export function DocumentList({ documents }: { documents: DocumentOut[] }) {
                     >
                       {Math.round(doc.confidence * 100)}%
                     </span>
+                  )}
+                  {doc.review_seconds !== null && (
+                    <Badge tone="success">redlines ready · {Math.round(doc.review_seconds)}s</Badge>
                   )}
                 </div>
               </div>

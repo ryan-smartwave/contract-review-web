@@ -21,3 +21,9 @@ test('empty list shows empty state', () => {
   render(<DocumentList documents={[]} />);
   expect(screen.getByText(/no contracts detected yet/i)).toBeInTheDocument();
 });
+
+test('card links to document page and shows latency chip', () => {
+  render(<DocumentList documents={[doc({ review_seconds: 42 })]} />);
+  expect(screen.getByRole('link', { name: /msa-v2\.docx/i })).toHaveAttribute('href', '/documents/1');
+  expect(screen.getByText(/redlines ready · 42s/i)).toBeInTheDocument();
+});

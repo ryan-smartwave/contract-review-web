@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DocumentIcon, ExternalLinkIcon, SearchIcon } from '@/components/ui/icons';
-import { searchDrive } from '@/lib/api';
+import { confirmDriveFile, searchDrive } from '@/lib/api';
 import type { DriveSearch } from '@/types/api';
 
 export function SearchPanel() {
@@ -62,6 +62,11 @@ export function SearchPanel() {
             {search.results.length} result{search.results.length === 1 ? '' : 's'}, most recently
             modified first
           </p>
+          {search.clarifying_question && (
+            <p className="rounded-md bg-warning/10 px-3 py-2 text-sm text-warning">
+              {search.clarifying_question}
+            </p>
+          )}
           <ul className="flex flex-col gap-3">
             {search.results.map((file) => (
               <li key={file.file_id}>
@@ -86,6 +91,23 @@ export function SearchPanel() {
                       <ExternalLinkIcon />
                     </a>
                   )}
+                  <Button
+                    onClick={async () => {
+                      setBusy(true);
+                      setError(null);
+                      try {
+                        const doc = await confirmDriveFile(file);
+                        window.location.assign(`/documents/${doc.id}`);
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : 'Could not start review');
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    disabled={busy}
+                  >
+                    Review
+                  </Button>
                 </Card>
               </li>
             ))}
