@@ -54,7 +54,8 @@ export function DocumentView({ documentId }: { documentId: number }) {
 
   const pendingAnchors = detail.suggestions
     .filter((s) => s.status === 'pending')
-    .map((s) => s.original_text);
+    .map((s) => s.original_text)
+    .sort((a, b) => b.length - a.length);
 
   return (
     <div className="flex flex-col gap-6">

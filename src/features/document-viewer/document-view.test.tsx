@@ -57,3 +57,23 @@ test('rejected suggestion stays visible as dismissed', async () => {
   await waitFor(() => expect(screen.getByText(/rejected/i)).toBeInTheDocument());
   expect(screen.queryByRole('button', { name: /apply/i })).not.toBeInTheDocument();
 });
+
+test('longer anchor wins when one original_text is a substring of another', async () => {
+  api.getDocument.mockResolvedValue(detail({
+    text: 'Term. Liability is unlimited. End.',
+    suggestions: [
+      {
+        id: 5, clause: 'Liability', original_text: 'Liability is unlimited.',
+        replacement_text: 'Liability is capped.', rationale: 'risk', status: 'pending',
+      },
+      {
+        id: 6, clause: 'Liability label', original_text: 'Liability',
+        replacement_text: 'Responsibility', rationale: 'terminology', status: 'pending',
+      },
+    ],
+  }));
+  render(<DocumentView documentId={1} />);
+  await waitFor(() =>
+    expect(screen.getByText('Liability is unlimited.', { selector: 'mark' })).toBeInTheDocument(),
+  );
+});
