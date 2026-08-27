@@ -13,6 +13,18 @@ export function UploadForm() {
   const [result, setResult] = useState<DocumentOut | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
+
+  function takeFile(candidate: File | null) {
+    if (!candidate) return;
+    if (!/\.(pdf|docx)$/i.test(candidate.name)) {
+      setError('Unsupported file type. Upload a PDF or DOCX.');
+      setFile(null);
+      return;
+    }
+    setError(null);
+    setFile(candidate);
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,7 +46,10 @@ export function UploadForm() {
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <label
           htmlFor="contract-file"
-          className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed border-border px-6 py-10 text-center transition-colors hover:border-primary hover:bg-surface"
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => { e.preventDefault(); setDragging(false); takeFile(e.dataTransfer.files?.[0] ?? null); }}
+          className={`flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors hover:border-primary hover:bg-surface ${dragging ? 'border-primary bg-surface' : 'border-border'}`}
         >
           <span className="mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
             <UploadCloudIcon />
@@ -48,7 +63,7 @@ export function UploadForm() {
                 {(file.size / 1024).toFixed(0)} KB
               </>
             ) : (
-              'Click here to browse your files'
+              'Click to browse or drag a file here'
             )}
           </span>
         </label>
@@ -56,7 +71,7 @@ export function UploadForm() {
           id="contract-file"
           type="file"
           accept=".pdf,.docx"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => takeFile(e.target.files?.[0] ?? null)}
           className="sr-only"
         />
         <Button type="submit" disabled={!file || busy}>

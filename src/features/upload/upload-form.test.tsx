@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 
@@ -28,4 +28,24 @@ test('shows backend error for unsupported type', async () => {
   await userEvent.upload(input, new File(['x'], 'cat.gif', { type: 'image/gif' }), { applyAccept: false });
   await userEvent.click(screen.getByRole('button', { name: /upload/i }));
   await waitFor(() => expect(screen.getByText(/Unsupported file type/)).toBeInTheDocument());
+});
+
+test('dropping a pdf selects it', () => {
+  render(<UploadForm />);
+  const zone = screen.getByText(/choose a contract/i).closest('label')!;
+  fireEvent.drop(zone, {
+    dataTransfer: { files: [new File(['%PDF'], 'dropped.pdf', { type: 'application/pdf' })] },
+  });
+  expect(screen.getByText(/dropped\.pdf/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /upload/i })).toBeEnabled();
+});
+
+test('dropping an unsupported file shows error and stays disabled', () => {
+  render(<UploadForm />);
+  const zone = screen.getByText(/choose a contract/i).closest('label')!;
+  fireEvent.drop(zone, {
+    dataTransfer: { files: [new File(['x'], 'cat.gif', { type: 'image/gif' })] },
+  });
+  expect(screen.getByText(/unsupported file type/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /upload/i })).toBeDisabled();
 });
