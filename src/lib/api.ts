@@ -1,4 +1,4 @@
-import type { DocumentOut, DriveFile } from '@/types/api';
+import type { DocumentOut, DocumentDetail, DriveFile, DriveSearch } from '@/types/api';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -19,9 +19,26 @@ export function uploadContract(file: File): Promise<DocumentOut> {
   return request('/upload', { method: 'POST', body: form });
 }
 
-export async function searchDrive(q: string): Promise<DriveFile[]> {
-  const body = await request<{ results: DriveFile[] }>(
-    `/drive/search?q=${encodeURIComponent(q)}`,
-  );
-  return body.results;
+export function searchDrive(q: string): Promise<DriveSearch> {
+  return request(`/drive/search?q=${encodeURIComponent(q)}`);
+}
+
+export function getDocument(id: number): Promise<DocumentDetail> {
+  return request(`/documents/${id}`);
+}
+
+export function applySuggestion(id: number): Promise<DocumentDetail> {
+  return request(`/suggestions/${id}/apply`, { method: 'POST' });
+}
+
+export function rejectSuggestion(id: number): Promise<DocumentDetail> {
+  return request(`/suggestions/${id}/reject`, { method: 'POST' });
+}
+
+export function confirmDriveFile(file: DriveFile): Promise<DocumentOut> {
+  return request('/drive/confirm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file_id: file.file_id, name: file.name, mime_type: file.mime_type }),
+  });
 }

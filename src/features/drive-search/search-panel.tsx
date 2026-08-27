@@ -6,11 +6,11 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DocumentIcon, ExternalLinkIcon, SearchIcon } from '@/components/ui/icons';
 import { searchDrive } from '@/lib/api';
-import type { DriveFile } from '@/types/api';
+import type { DriveSearch } from '@/types/api';
 
 export function SearchPanel() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<DriveFile[] | null>(null);
+  const [search, setSearch] = useState<DriveSearch | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -19,9 +19,9 @@ export function SearchPanel() {
     if (!query.trim()) return;
     setBusy(true);
     setError(null);
-    setResults(null);
+    setSearch(null);
     try {
-      setResults(await searchDrive(query.trim()));
+      setSearch(await searchDrive(query.trim()));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
     } finally {
@@ -49,21 +49,21 @@ export function SearchPanel() {
         </Button>
       </form>
       {error && <p className="text-sm text-danger">{error}</p>}
-      {results !== null && results.length === 0 && (
+      {search !== null && search.results.length === 0 && (
         <EmptyState
           icon={<SearchIcon className="h-6 w-6" />}
           title="No matching contracts found"
           description="Try a different keyword, or upload the contract manually."
         />
       )}
-      {results !== null && results.length > 0 && (
+      {search !== null && search.results.length > 0 && (
         <>
           <p className="text-sm text-text-muted">
-            {results.length} result{results.length === 1 ? '' : 's'}, most recently
+            {search.results.length} result{search.results.length === 1 ? '' : 's'}, most recently
             modified first
           </p>
           <ul className="flex flex-col gap-3">
-            {results.map((file) => (
+            {search.results.map((file) => (
               <li key={file.file_id}>
                 <Card className="flex items-center gap-4 transition-shadow hover:shadow-md">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">

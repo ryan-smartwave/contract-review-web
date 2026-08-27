@@ -8,10 +8,13 @@ vi.mock('@/lib/api', () => ({ searchDrive: (...a: unknown[]) => searchDrive(...a
 import { SearchPanel } from './search-panel';
 
 test('renders results with name and modified date', async () => {
-  searchDrive.mockResolvedValue([{
-    file_id: 'f1', name: 'Acme MSA v3.pdf', mime_type: 'application/pdf',
-    modified_time: '2026-08-01T00:00:00Z', web_view_link: 'https://drive.google.com/x',
-  }]);
+  searchDrive.mockResolvedValue({
+    results: [{
+      file_id: 'f1', name: 'Acme MSA v3.pdf', mime_type: 'application/pdf',
+      modified_time: '2026-08-01T00:00:00Z', web_view_link: 'https://drive.google.com/x',
+    }],
+    clarifying_question: null,
+  });
   render(<SearchPanel />);
   await userEvent.type(screen.getByRole('searchbox'), 'acme');
   await userEvent.click(screen.getByRole('button', { name: /search/i }));
@@ -22,7 +25,7 @@ test('renders results with name and modified date', async () => {
 });
 
 test('no matches shows graceful empty state', async () => {
-  searchDrive.mockResolvedValue([]);
+  searchDrive.mockResolvedValue({ results: [], clarifying_question: null });
   render(<SearchPanel />);
   await userEvent.type(screen.getByRole('searchbox'), 'zzz');
   await userEvent.click(screen.getByRole('button', { name: /search/i }));

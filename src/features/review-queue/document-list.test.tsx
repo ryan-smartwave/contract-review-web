@@ -7,7 +7,7 @@ const doc = (over: Partial<DocumentOut>): DocumentOut => ({
   id: 1, filename: 'msa-v2.docx', source: 'email',
   mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   detected_at: '2026-08-26T05:00:00Z', is_contract_revision: true,
-  confidence: 0.93, reasoning: 'Redlined MSA', ...over,
+  confidence: 0.93, reasoning: 'Redlined MSA', review_seconds: null, ...over,
 });
 
 test('renders documents with classification badge and confidence', () => {
