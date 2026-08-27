@@ -4,7 +4,10 @@ import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
 
-export const metadata = { title: 'Contract Review Agent' };
+export const metadata = {
+  title: 'Contract Review Agent',
+  robots: { index: false, follow: false },
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
