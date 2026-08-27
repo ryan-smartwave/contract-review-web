@@ -31,15 +31,21 @@ export function UploadForm() {
   return (
     <Card className="max-w-lg">
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <label className="text-sm font-medium" htmlFor="contract-file">
-          Choose a contract (PDF or DOCX)
+        <label
+          htmlFor="contract-file"
+          className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed border-border px-6 py-10 text-center transition-colors hover:border-primary hover:bg-surface"
+        >
+          <span className="font-medium">Choose a contract (PDF or DOCX)</span>
+          <span className="text-sm text-text-muted">
+            {file ? file.name : 'Click here to browse your files'}
+          </span>
         </label>
         <input
           id="contract-file"
           type="file"
           accept=".pdf,.docx"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="text-sm"
+          className="sr-only"
         />
         <Button type="submit" disabled={!file || busy}>
           {busy ? 'Uploading…' : 'Upload'}
