@@ -115,6 +115,20 @@ test('versions with a filename render as download links', async () => {
   expect(v2.getAttribute('href')).toContain('/versions/2/file');
 });
 
+test('version without a filename renders without a link or stray leading space', async () => {
+  api.getDocument.mockResolvedValue(detail({
+    versions: [
+      { version_number: 1, source_suggestion_id: null, created_at: '2026-08-27T00:00:00Z', filename: 'msa.pdf' },
+      { version_number: 2, source_suggestion_id: 5, created_at: '2026-08-27T00:01:00Z', filename: null },
+    ],
+  }));
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getByRole('link', { name: 'msa.pdf' }));
+  expect(screen.queryByRole('link', { name: /v2/i })).not.toBeInTheDocument();
+  const v2Item = screen.getByText(/from suggestion #5/).closest('li');
+  expect(v2Item?.textContent?.startsWith('v2')).toBe(true);
+});
+
 test('paragraph breaks render as separate blocks with title styling', async () => {
   api.getDocument.mockResolvedValue(detail({
     text: 'MASTER SERVICES AGREEMENT\n\n1. TERM. Twelve months.\n\n2. FEES. Ninety days.',

@@ -147,15 +147,17 @@ export function DocumentView({ documentId }: { documentId: number }) {
           <ul className="flex flex-col gap-1 text-sm text-text-muted">
             {detail.versions.map((v) => (
               <li key={v.version_number}>
-                {v.filename !== null ? (
-                  <a
-                    href={versionFileUrl(detail.id, v.version_number)}
-                    download
-                    className="text-primary hover:underline"
-                  >
-                    {v.filename}
-                  </a>
-                ) : null}{' '}
+                {v.filename ? (
+                  <>
+                    <a
+                      href={versionFileUrl(detail.id, v.version_number)}
+                      download
+                      className="text-primary hover:underline"
+                    >
+                      {v.filename}
+                    </a>{' '}
+                  </>
+                ) : null}
                 v{v.version_number} · {new Date(v.created_at).toLocaleString()}
                 {v.source_suggestion_id ? ` · from suggestion #${v.source_suggestion_id}` : ' · original'}
               </li>
