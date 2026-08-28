@@ -13,6 +13,10 @@ export function listDocuments(): Promise<DocumentOut[]> {
   return request('/documents');
 }
 
+export function documentFileUrl(id: number): string {
+  return `${BASE}/documents/${id}/file`;
+}
+
 export function uploadContract(file: File): Promise<DocumentOut> {
   const form = new FormData();
   form.append('file', file);

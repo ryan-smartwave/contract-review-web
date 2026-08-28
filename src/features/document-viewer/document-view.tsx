@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -7,6 +8,12 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { applySuggestion, getDocument, rejectSuggestion } from '@/lib/api';
 import type { DocumentDetail } from '@/types/api';
 import { SuggestionCard } from './suggestion-card';
+
+// pdf.js touches browser-only globals; never render this on the server
+const OriginalDocument = dynamic(() => import('./original-document'), {
+  ssr: false,
+  loading: () => <p className="text-sm text-text-muted">Rendering document…</p>,
+});
 
 function highlight(text: string, anchors: string[]) {
   let segments: (string | { mark: string })[] = [text];
@@ -30,6 +37,7 @@ export function DocumentView({ documentId }: { documentId: number }) {
   const [detail, setDetail] = useState<DocumentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<'review' | 'original'>('review');
 
   useEffect(() => {
     getDocument(documentId).then(setDetail).catch((e) =>
@@ -66,10 +74,33 @@ export function DocumentView({ documentId }: { documentId: number }) {
         )}
       </div>
       {error && <p className="text-sm text-danger">{error}</p>}
+      <div className="flex gap-1 border-b border-border" role="tablist">
+        {([['review', 'Review'], ['original', 'Original document']] as const).map(([key, label]) => (
+          <button
+            key={key}
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab(key)}
+            className={`-mb-px rounded-t-md border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+              tab === key
+                ? 'border-primary text-primary'
+                : 'border-transparent text-text-muted hover:text-text'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <div className="grid gap-6 md:grid-cols-[1fr_340px]">
-        <Card className="whitespace-pre-wrap text-sm leading-7">
-          {detail.text ? highlight(detail.text, pendingAnchors) : 'No text extracted for this document.'}
-        </Card>
+        {tab === 'review' ? (
+          <Card className="whitespace-pre-wrap text-sm leading-7">
+            {detail.text ? highlight(detail.text, pendingAnchors) : 'No text extracted for this document.'}
+          </Card>
+        ) : (
+          <Card className="overflow-x-auto">
+            <OriginalDocument documentId={detail.id} mimeType={detail.mime_type} />
+          </Card>
+        )}
         <div className="flex flex-col gap-3">
           <p className="text-sm font-semibold">Suggested redlines ({detail.suggestions.length})</p>
           {detail.suggestions.length === 0 && (

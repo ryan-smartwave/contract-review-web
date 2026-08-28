@@ -4,6 +4,10 @@ import { expect, test, vi } from 'vitest';
 import type { DocumentDetail } from '@/types/api';
 
 const api = { getDocument: vi.fn(), applySuggestion: vi.fn(), rejectSuggestion: vi.fn() };
+vi.mock('./original-document', () => ({
+  default: () => <div>ORIGINAL DOC RENDER</div>,
+}));
+
 vi.mock('@/lib/api', () => ({
   getDocument: (...a: unknown[]) => api.getDocument(...a),
   applySuggestion: (...a: unknown[]) => api.applySuggestion(...a),
@@ -76,4 +80,15 @@ test('longer anchor wins when one original_text is a substring of another', asyn
   await waitFor(() =>
     expect(screen.getByText('Liability is unlimited.', { selector: 'mark' })).toBeInTheDocument(),
   );
+});
+
+test('original tab renders the styled document and review tab returns', async () => {
+  api.getDocument.mockResolvedValue(detail());
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getByRole('tab', { name: /original document/i }));
+  await userEvent.click(screen.getByRole('tab', { name: /original document/i }));
+  await waitFor(() => expect(screen.getByText('ORIGINAL DOC RENDER')).toBeInTheDocument());
+  expect(screen.queryByText(/Term is 12 months/)).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('tab', { name: /^review$/i }));
+  expect(screen.getByText(/Term is 12 months/)).toBeInTheDocument();
 });
