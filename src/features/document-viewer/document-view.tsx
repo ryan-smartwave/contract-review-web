@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { applySuggestion, getDocument, rejectSuggestion } from '@/lib/api';
-import type { DocumentDetail } from '@/types/api';
+import type { DocumentDetail, Suggestion } from '@/types/api';
 import { SuggestionCard } from './suggestion-card';
 
 // pdf.js touches browser-only globals; never render this on the server
@@ -15,22 +15,39 @@ const OriginalDocument = dynamic(() => import('./original-document'), {
   loading: () => <p className="text-sm text-text-muted">Rendering document…</p>,
 });
 
-function highlight(text: string, anchors: string[]) {
-  let segments: (string | { mark: string })[] = [text];
-  for (const anchor of anchors) {
+type Segment = string | { suggestion: Suggestion };
+
+function segment(text: string, pending: Suggestion[]): Segment[] {
+  let segments: Segment[] = [text];
+  for (const suggestion of pending) {
     segments = segments.flatMap((seg) => {
-      if (typeof seg !== 'string' || !seg.includes(anchor)) return [seg];
-      const [before, ...rest] = seg.split(anchor);
-      return [before, { mark: anchor }, rest.join(anchor)];
+      if (typeof seg !== 'string' || !seg.includes(suggestion.original_text)) return [seg];
+      const [before, ...rest] = seg.split(suggestion.original_text);
+      return [before, { suggestion }, rest.join(suggestion.original_text)];
     });
   }
-  return segments.map((seg, i) =>
+  return segments;
+}
+
+function redline(text: string, pending: Suggestion[]) {
+  return segment(text, pending).map((seg, i) =>
     typeof seg === 'string' ? (
       <span key={i}>{seg}</span>
     ) : (
-      <mark key={i} className="rounded bg-warning/20 px-0.5">{seg.mark}</mark>
+      <span key={i}>
+        <del className="rounded bg-danger/10 px-0.5 text-danger decoration-danger/60">
+          {seg.suggestion.original_text}
+        </del>{' '}
+        <ins className="rounded bg-success/10 px-0.5 text-success decoration-success/60">
+          {seg.suggestion.replacement_text}
+        </ins>
+      </span>
     ),
   );
+}
+
+function isTitle(paragraph: string) {
+  return paragraph.length < 80 && /[A-Z]/.test(paragraph) && paragraph === paragraph.toUpperCase();
 }
 
 export function DocumentView({ documentId }: { documentId: number }) {
@@ -60,10 +77,9 @@ export function DocumentView({ documentId }: { documentId: number }) {
   if (error && !detail) return <EmptyState title="Could not load document" description={error} />;
   if (!detail) return <p className="text-sm text-text-muted">Loading…</p>;
 
-  const pendingAnchors = detail.suggestions
+  const pending = detail.suggestions
     .filter((s) => s.status === 'pending')
-    .map((s) => s.original_text)
-    .sort((a, b) => b.length - a.length);
+    .sort((a, b) => b.original_text.length - a.original_text.length);
 
   return (
     <div className="flex flex-col gap-6">
@@ -93,8 +109,20 @@ export function DocumentView({ documentId }: { documentId: number }) {
       </div>
       <div className="grid gap-6 md:grid-cols-[1fr_340px]">
         {tab === 'review' ? (
-          <Card className="whitespace-pre-wrap text-sm leading-7">
-            {detail.text ? highlight(detail.text, pendingAnchors) : 'No text extracted for this document.'}
+          <Card className="px-8 py-10 font-serif text-[15px] leading-7 sm:px-12">
+            {detail.text
+              ? detail.text.split(/\n{2,}/).map((paragraph, i) => (
+                  <p
+                    key={i}
+                    data-doc-paragraph
+                    className={`${i > 0 ? 'mt-4' : ''} ${
+                      isTitle(paragraph) ? 'text-center font-semibold tracking-wide' : ''
+                    }`}
+                  >
+                    {redline(paragraph, pending)}
+                  </p>
+                ))
+              : 'No text extracted for this document.'}
           </Card>
         ) : (
           <Card className="overflow-x-auto">

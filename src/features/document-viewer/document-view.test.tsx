@@ -33,8 +33,9 @@ test('renders text, highlighted anchor, latency, and suggestion card', async () 
   api.getDocument.mockResolvedValue(detail());
   render(<DocumentView documentId={1} />);
   await waitFor(() => expect(screen.getByText(/Term is 12 months/)).toBeInTheDocument());
-  expect(screen.getByText('Liability is unlimited.', { selector: 'mark' })).toBeInTheDocument();
+  expect(screen.getByText('Liability is unlimited.', { selector: 'del' })).toBeInTheDocument();
   expect(screen.getByText(/ready in 42s/i)).toBeInTheDocument();
+  expect(screen.getByText('Liability is capped.', { selector: 'ins' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /apply/i })).toBeInTheDocument();
 });
 
@@ -78,7 +79,7 @@ test('longer anchor wins when one original_text is a substring of another', asyn
   }));
   render(<DocumentView documentId={1} />);
   await waitFor(() =>
-    expect(screen.getByText('Liability is unlimited.', { selector: 'mark' })).toBeInTheDocument(),
+    expect(screen.getByText('Liability is unlimited.', { selector: 'del' })).toBeInTheDocument(),
   );
 });
 
@@ -91,4 +92,16 @@ test('original tab renders the styled document and review tab returns', async ()
   expect(screen.queryByText(/Term is 12 months/)).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole('tab', { name: /^review$/i }));
   expect(screen.getByText(/Term is 12 months/)).toBeInTheDocument();
+});
+
+test('paragraph breaks render as separate blocks with title styling', async () => {
+  api.getDocument.mockResolvedValue(detail({
+    text: 'MASTER SERVICES AGREEMENT\n\n1. TERM. Twelve months.\n\n2. FEES. Ninety days.',
+    suggestions: [],
+  }));
+  const { container } = render(<DocumentView documentId={1} />);
+  await waitFor(() => expect(screen.getByText('MASTER SERVICES AGREEMENT')).toBeInTheDocument());
+  const paras = container.querySelectorAll('[data-doc-paragraph]');
+  expect(paras.length).toBe(3);
+  expect(screen.getByText('MASTER SERVICES AGREEMENT').closest('p')?.className).toContain('font-semibold');
 });
