@@ -12,6 +12,8 @@ vi.mock('@/lib/api', () => ({
   getDocument: (...a: unknown[]) => api.getDocument(...a),
   applySuggestion: (...a: unknown[]) => api.applySuggestion(...a),
   rejectSuggestion: (...a: unknown[]) => api.rejectSuggestion(...a),
+  versionFileUrl: (documentId: number, versionNumber: number) =>
+    `http://localhost:8000/documents/${documentId}/versions/${versionNumber}/file`,
 }));
 
 import { DocumentView } from './document-view';
@@ -25,7 +27,9 @@ const detail = (over: Partial<DocumentDetail> = {}): DocumentDetail => ({
     id: 5, clause: 'Liability', original_text: 'Liability is unlimited.',
     replacement_text: 'Liability is capped.', rationale: 'risk', status: 'pending',
   }],
-  versions: [{ version_number: 1, source_suggestion_id: null, created_at: '2026-08-27T00:00:00Z' }],
+  versions: [
+    { version_number: 1, source_suggestion_id: null, created_at: '2026-08-27T00:00:00Z', filename: 'msa.pdf' },
+  ],
   ...over,
 });
 
@@ -44,7 +48,10 @@ test('apply updates the document and marks suggestion applied', async () => {
   api.applySuggestion.mockResolvedValue(detail({
     text: 'Term is 12 months. Liability is capped.',
     suggestions: [{ ...detail().suggestions[0], status: 'applied' }],
-    versions: [...detail().versions, { version_number: 2, source_suggestion_id: 5, created_at: '2026-08-27T00:01:00Z' }],
+    versions: [
+      ...detail().versions,
+      { version_number: 2, source_suggestion_id: 5, created_at: '2026-08-27T00:01:00Z', filename: null },
+    ],
   }));
   render(<DocumentView documentId={1} />);
   await waitFor(() => screen.getByRole('button', { name: /apply/i }));
@@ -92,6 +99,20 @@ test('original tab renders the styled document and review tab returns', async ()
   expect(screen.queryByText(/Term is 12 months/)).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole('tab', { name: /^review$/i }));
   expect(screen.getByText(/Term is 12 months/)).toBeInTheDocument();
+});
+
+test('versions with a filename render as download links', async () => {
+  api.getDocument.mockResolvedValue(detail({
+    versions: [
+      { version_number: 1, source_suggestion_id: null, created_at: '2026-08-27T00:00:00Z', filename: 'msa.pdf' },
+      { version_number: 2, source_suggestion_id: 5, created_at: '2026-08-27T00:01:00Z', filename: 'msa - v2.docx' },
+    ],
+  }));
+  render(<DocumentView documentId={1} />);
+  const v1 = await waitFor(() => screen.getByRole('link', { name: 'msa.pdf' }));
+  const v2 = screen.getByRole('link', { name: 'msa - v2.docx' });
+  expect(v1.getAttribute('href')).toContain('/versions/1/file');
+  expect(v2.getAttribute('href')).toContain('/versions/2/file');
 });
 
 test('paragraph breaks render as separate blocks with title styling', async () => {

@@ -31,6 +31,7 @@ export type VersionInfo = {
   version_number: number;
   source_suggestion_id: number | null;
   created_at: string;
+  filename: string | null;
 };
 
 export type DocumentDetail = DocumentOut & {
