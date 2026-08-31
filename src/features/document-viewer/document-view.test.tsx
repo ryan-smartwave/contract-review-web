@@ -3,15 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 import type { DocumentDetail } from '@/types/api';
 
-const api = { getDocument: vi.fn(), applySuggestion: vi.fn(), rejectSuggestion: vi.fn() };
+const api = { getDocument: vi.fn(), confirmSuggestions: vi.fn() };
 vi.mock('./original-document', () => ({
   default: () => <div>ORIGINAL DOC RENDER</div>,
 }));
 
 vi.mock('@/lib/api', () => ({
   getDocument: (...a: unknown[]) => api.getDocument(...a),
-  applySuggestion: (...a: unknown[]) => api.applySuggestion(...a),
-  rejectSuggestion: (...a: unknown[]) => api.rejectSuggestion(...a),
+  confirmSuggestions: (...a: unknown[]) => api.confirmSuggestions(...a),
   versionFileUrl: (documentId: number, versionNumber: number) =>
     `http://localhost:8000/documents/${documentId}/versions/${versionNumber}/file`,
 }));
@@ -40,25 +39,66 @@ test('renders text, highlighted anchor, latency, and suggestion card', async () 
   expect(screen.getByText('Liability is unlimited.', { selector: 'del' })).toBeInTheDocument();
   expect(screen.getByText(/ready in 42s/i)).toBeInTheDocument();
   expect(screen.getByText('Liability is capped.', { selector: 'ins' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /apply/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /accept/i })).toBeInTheDocument();
 });
 
-test('apply updates the document and marks suggestion applied', async () => {
-  api.getDocument.mockResolvedValue(detail());
-  api.applySuggestion.mockResolvedValue(detail({
+test('accept stages locally and confirm sends one batch with all decisions', async () => {
+  api.getDocument.mockResolvedValue(detail({
+    suggestions: [
+      detail().suggestions[0],
+      {
+        id: 6, clause: 'Term', original_text: 'Term is 12 months.',
+        replacement_text: 'Term is 24 months.', rationale: 'longer', status: 'pending',
+      },
+    ],
+  }));
+  api.confirmSuggestions.mockResolvedValue(detail({
     text: 'Term is 12 months. Liability is capped.',
-    suggestions: [{ ...detail().suggestions[0], status: 'applied' }],
+    suggestions: [
+      { ...detail().suggestions[0], status: 'applied' },
+      {
+        id: 6, clause: 'Term', original_text: 'Term is 12 months.',
+        replacement_text: 'Term is 24 months.', rationale: 'longer', status: 'rejected',
+      },
+    ],
     versions: [
       ...detail().versions,
-      { version_number: 2, source_suggestion_id: 5, created_at: '2026-08-27T00:01:00Z', filename: null },
+      { version_number: 2, source_suggestion_id: null, created_at: '2026-08-27T00:01:00Z', filename: 'msa - v2.docx' },
     ],
   }));
   render(<DocumentView documentId={1} />);
-  await waitFor(() => screen.getByRole('button', { name: /apply/i }));
-  await userEvent.click(screen.getByRole('button', { name: /apply/i }));
-  await waitFor(() => expect(screen.getAllByText(/Liability is capped/).length).toBeGreaterThan(0));
-  expect(screen.getByText(/applied/i)).toBeInTheDocument();
-  expect(screen.getByText(/v2/i)).toBeInTheDocument();
+  await waitFor(() => screen.getAllByRole('button', { name: /accept/i }));
+  await userEvent.click(screen.getAllByRole('button', { name: /accept/i })[0]);
+  await userEvent.click(screen.getAllByRole('button', { name: /^reject$/i })[1]);
+  expect(api.confirmSuggestions).not.toHaveBeenCalled();
+  const confirm = screen.getByRole('button', { name: /confirm & save \(2\)/i });
+  await userEvent.click(confirm);
+  await waitFor(() => expect(api.confirmSuggestions).toHaveBeenCalledWith(1, [5], [6]));
+  await waitFor(() => expect(screen.getByText(/applied/i)).toBeInTheDocument());
+  expect(screen.getByRole('link', { name: 'msa - v2.docx' })).toBeInTheDocument();
+});
+
+test('clicking a staged choice again unstages it and hides the confirm bar', async () => {
+  api.getDocument.mockResolvedValue(detail());
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getByRole('button', { name: /accept/i }));
+  await userEvent.click(screen.getByRole('button', { name: /accept/i }));
+  expect(screen.getByRole('button', { name: /confirm & save \(1\)/i })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: /accept/i }));
+  expect(screen.queryByRole('button', { name: /confirm & save/i })).not.toBeInTheDocument();
+});
+
+test('batch version without a source suggestion is labeled as confirmed changes', async () => {
+  api.getDocument.mockResolvedValue(detail({
+    versions: [
+      { version_number: 1, source_suggestion_id: null, created_at: '2026-08-27T00:00:00Z', filename: 'msa.pdf' },
+      { version_number: 2, source_suggestion_id: null, created_at: '2026-08-27T00:01:00Z', filename: 'msa - v2.docx' },
+    ],
+  }));
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getByRole('link', { name: 'msa - v2.docx' }));
+  expect(screen.getByText(/confirmed changes/)).toBeInTheDocument();
+  expect(screen.getByText(/· original/)).toBeInTheDocument();
 });
 
 test('rejected suggestion stays visible as dismissed', async () => {
@@ -67,7 +107,7 @@ test('rejected suggestion stays visible as dismissed', async () => {
   }));
   render(<DocumentView documentId={1} />);
   await waitFor(() => expect(screen.getByText(/rejected/i)).toBeInTheDocument());
-  expect(screen.queryByRole('button', { name: /apply/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /accept/i })).not.toBeInTheDocument();
 });
 
 test('longer anchor wins when one original_text is a substring of another', async () => {

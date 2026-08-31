@@ -5,9 +5,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { applySuggestion, getDocument, rejectSuggestion, versionFileUrl } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { confirmSuggestions, getDocument, versionFileUrl } from '@/lib/api';
 import type { DocumentDetail, Suggestion } from '@/types/api';
-import { SuggestionCard } from './suggestion-card';
+import { SuggestionCard, type StagedChoice } from './suggestion-card';
 
 // pdf.js touches browser-only globals; never render this on the server
 const OriginalDocument = dynamic(() => import('./original-document'), {
@@ -55,24 +56,34 @@ export function DocumentView({ documentId }: { documentId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<'review' | 'original'>('review');
+  const [staged, setStaged] = useState<Record<number, StagedChoice>>({});
 
   useEffect(() => {
     getDocument(documentId).then(setDetail).catch((e) =>
       setError(e instanceof Error ? e.message : 'Failed to load document'));
   }, [documentId]);
 
-  const act = useCallback(async (fn: (id: number) => Promise<DocumentDetail>, id: number) => {
+  const stage = useCallback((id: number, choice: 'accept' | 'reject') => {
+    setStaged((prev) => ({ ...prev, [id]: prev[id] === choice ? null : choice }));
+  }, []);
+
+  const stagedEntries = Object.entries(staged).filter(([, choice]) => choice !== null);
+
+  const confirm = useCallback(async () => {
+    const appliedIds = stagedEntries.filter(([, c]) => c === 'accept').map(([id]) => Number(id));
+    const rejectedIds = stagedEntries.filter(([, c]) => c === 'reject').map(([id]) => Number(id));
     setBusy(true);
     setError(null);
     try {
-      setDetail(await fn(id));
+      setDetail(await confirmSuggestions(documentId, appliedIds, rejectedIds));
+      setStaged({});
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Action failed');
       setDetail(await getDocument(documentId));
     } finally {
       setBusy(false);
     }
-  }, [documentId]);
+  }, [documentId, stagedEntries]);
 
   if (error && !detail) return <EmptyState title="Could not load document" description={error} />;
   if (!detail) return <p className="text-sm text-text-muted">Loading…</p>;
@@ -139,10 +150,21 @@ export function DocumentView({ documentId }: { documentId: number }) {
               key={s.id}
               suggestion={s}
               busy={busy}
-              onApply={() => act(applySuggestion, s.id)}
-              onReject={() => act(rejectSuggestion, s.id)}
+              staged={staged[s.id] ?? null}
+              onStage={(choice) => stage(s.id, choice)}
             />
           ))}
+          {stagedEntries.length > 0 && (
+            <div className="sticky bottom-4 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-raised p-3 shadow-md">
+              <p className="text-sm text-text-muted">
+                {stagedEntries.filter(([, c]) => c === 'accept').length} accepted ·{' '}
+                {stagedEntries.filter(([, c]) => c === 'reject').length} rejected
+              </p>
+              <Button onClick={confirm} disabled={busy}>
+                Confirm &amp; save ({stagedEntries.length})
+              </Button>
+            </div>
+          )}
           <p className="mt-2 text-sm font-semibold">Versions</p>
           <ul className="flex flex-col gap-1 text-sm text-text-muted">
             {detail.versions.map((v) => (
@@ -159,7 +181,11 @@ export function DocumentView({ documentId }: { documentId: number }) {
                   </>
                 ) : null}
                 v{v.version_number} · {new Date(v.created_at).toLocaleString()}
-                {v.source_suggestion_id ? ` · from suggestion #${v.source_suggestion_id}` : ' · original'}
+                {v.source_suggestion_id
+                  ? ` · from suggestion #${v.source_suggestion_id}`
+                  : v.version_number === 1
+                    ? ' · original'
+                    : ' · confirmed changes'}
               </li>
             ))}
           </ul>

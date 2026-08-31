@@ -5,16 +5,18 @@ import type { Suggestion } from '@/types/api';
 
 const tones = { pending: 'warning', applied: 'success', rejected: 'neutral', stale: 'danger' } as const;
 
+export type StagedChoice = 'accept' | 'reject' | null;
+
 export function SuggestionCard({
   suggestion,
   busy,
-  onApply,
-  onReject,
+  staged,
+  onStage,
 }: {
   suggestion: Suggestion;
   busy: boolean;
-  onApply: () => void;
-  onReject: () => void;
+  staged: StagedChoice;
+  onStage: (choice: 'accept' | 'reject') => void;
 }) {
   return (
     <Card className="flex flex-col gap-2">
@@ -27,8 +29,22 @@ export function SuggestionCard({
       <p className="text-xs text-text-muted">{suggestion.rationale}</p>
       {suggestion.status === 'pending' && (
         <div className="mt-1 flex gap-2">
-          <Button onClick={onApply} disabled={busy}>Apply</Button>
-          <Button variant="secondary" onClick={onReject} disabled={busy}>Reject</Button>
+          <Button
+            variant={staged === 'accept' ? 'primary' : 'secondary'}
+            aria-pressed={staged === 'accept'}
+            onClick={() => onStage('accept')}
+            disabled={busy}
+          >
+            Accept
+          </Button>
+          <Button
+            variant={staged === 'reject' ? 'primary' : 'secondary'}
+            aria-pressed={staged === 'reject'}
+            onClick={() => onStage('reject')}
+            disabled={busy}
+          >
+            Reject
+          </Button>
         </div>
       )}
     </Card>

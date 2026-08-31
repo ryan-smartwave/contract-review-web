@@ -35,12 +35,16 @@ export function getDocument(id: number): Promise<DocumentDetail> {
   return request(`/documents/${id}`);
 }
 
-export function applySuggestion(id: number): Promise<DocumentDetail> {
-  return request(`/suggestions/${id}/apply`, { method: 'POST' });
-}
-
-export function rejectSuggestion(id: number): Promise<DocumentDetail> {
-  return request(`/suggestions/${id}/reject`, { method: 'POST' });
+export function confirmSuggestions(
+  documentId: number,
+  appliedIds: number[],
+  rejectedIds: number[],
+): Promise<DocumentDetail> {
+  return request(`/documents/${documentId}/suggestions/batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ applied_ids: appliedIds, rejected_ids: rejectedIds }),
+  });
 }
 
 export function confirmDriveFile(file: DriveFile): Promise<DocumentOut> {

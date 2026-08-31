@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { applySuggestion, confirmDriveFile, getDocument, listDocuments, rejectSuggestion, searchDrive, uploadContract } from './api';
+import { confirmDriveFile, confirmSuggestions, listDocuments, searchDrive, uploadContract } from './api';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -29,12 +29,14 @@ test('searchDrive returns results and clarifying question', async () => {
   expect(search.clarifying_question).toBeNull();
 });
 
-test('applySuggestion posts and returns detail', async () => {
+test('confirmSuggestions posts one batch and returns detail', async () => {
   mockFetch(200, { id: 1, text: 'new text', suggestions: [], versions: [] });
-  const detail = await applySuggestion(5);
+  const detail = await confirmSuggestions(1, [5, 6], [7]);
   expect(detail.text).toBe('new text');
-  expect(vi.mocked(fetch).mock.calls[0][0]).toContain('/suggestions/5/apply');
-  expect(vi.mocked(fetch).mock.calls[0][1]?.method).toBe('POST');
+  const [url, init] = vi.mocked(fetch).mock.calls[0];
+  expect(url).toContain('/documents/1/suggestions/batch');
+  expect(init?.method).toBe('POST');
+  expect(JSON.parse(init?.body as string)).toEqual({ applied_ids: [5, 6], rejected_ids: [7] });
 });
 
 test('confirmDriveFile posts file identity', async () => {
