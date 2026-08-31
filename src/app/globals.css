@@ -1,25 +1,48 @@
 @import 'tailwindcss';
 
 :root {
-  /* Generic professional palette — ONE place to change
-     if client branding is applied later. */
-  --color-primary: #1b3fa0;
-  --color-primary-hover: #16337f;
+  /* APC Design System — Stockholm (light), from apc.tokens.json.
+     Semantic names kept from the original palette so components
+     don't change when the theme does. */
+  --color-primary: #103f58; /* stockholm.neptune */
+  --color-primary-hover: #0b2d40;
   --color-primary-foreground: #ffffff;
-  --color-surface: #f7f8fb;
+  --color-accent: #d4f553; /* stockholm.lime */
+  --color-accent-foreground: #111215;
+  --color-surface: #f5f6f6; /* semantic.surface.page */
   --color-surface-raised: #ffffff;
-  --color-border: #dde2ee;
-  --color-text: #101828;
-  --color-text-muted: #5b6474;
-  --color-success: #0e7a4d;
-  --color-danger: #b42318;
-  --color-warning: #b54708;
+  --color-border: #dadbdd;
+  --color-text: #111215;
+  --color-text-muted: #444955; /* semantic.text.secondary */
+  --color-success: #2b893c; /* state.success-text */
+  --color-danger: #9a001c; /* state.error-text */
+  --color-warning: #a76f00; /* state.warning-text */
+  --color-focus: #b8cee1; /* semantic.border.focus (spritz) */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Stockholm dark (sl-dark mode) */
+    --color-primary: #d4f553; /* action.primary flips to lime */
+    --color-primary-hover: #c7eb3c;
+    --color-primary-foreground: #111215;
+    --color-surface: #111215;
+    --color-surface-raised: #22252b;
+    --color-border: #333740;
+    --color-text: #ffffff;
+    --color-text-muted: #dadbdd;
+    --color-success: #8cec7f;
+    --color-danger: #ff738d;
+    --color-warning: #ffd28a;
+  }
 }
 
 @theme inline {
   --color-primary: var(--color-primary);
   --color-primary-hover: var(--color-primary-hover);
   --color-primary-foreground: var(--color-primary-foreground);
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
   --color-surface: var(--color-surface);
   --color-surface-raised: var(--color-surface-raised);
   --color-border: var(--color-border);
@@ -28,7 +51,9 @@
   --color-success: var(--color-success);
   --color-danger: var(--color-danger);
   --color-warning: var(--color-warning);
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --color-focus: var(--color-focus);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-fira-code), ui-monospace, monospace;
 }
 
 body {
@@ -38,6 +63,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+  /* effect.focus-ring: 3px spritz */
+  outline: 3px solid var(--color-focus);
+  outline-offset: 0;
 }
