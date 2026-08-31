@@ -101,6 +101,53 @@ test('batch version without a source suggestion is labeled as confirmed changes'
   expect(screen.getByText(/· original/)).toBeInTheDocument();
 });
 
+test('failed confirm prunes staged ids that are no longer pending', async () => {
+  const second = {
+    id: 6, clause: 'Term', original_text: 'Term is 12 months.',
+    replacement_text: 'Term is 24 months.', rationale: 'longer', status: 'pending' as const,
+  };
+  api.getDocument.mockResolvedValueOnce(detail({ suggestions: [detail().suggestions[0], second] }));
+  api.confirmSuggestions.mockRejectedValue(new Error('Suggestion already applied'));
+  // refetch after the failure: suggestion 5 was actioned elsewhere, 6 still pending
+  api.getDocument.mockResolvedValueOnce(detail({
+    suggestions: [{ ...detail().suggestions[0], status: 'applied' }, second],
+  }));
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getAllByRole('button', { name: /accept/i }));
+  await userEvent.click(screen.getAllByRole('button', { name: /accept/i })[0]);
+  await userEvent.click(screen.getAllByRole('button', { name: /accept/i })[1]);
+  await userEvent.click(screen.getByRole('button', { name: /confirm & save \(2\)/i }));
+  await waitFor(() => expect(screen.getByText(/already applied/i)).toBeInTheDocument());
+  // the dead id is unstaged; the still-pending one survives
+  expect(screen.getByRole('button', { name: /confirm & save \(1\)/i })).toBeInTheDocument();
+});
+
+test('confirm failure with a failing refetch still shows the error', async () => {
+  api.getDocument.mockResolvedValueOnce(detail());
+  api.confirmSuggestions.mockRejectedValue(new Error('Network down'));
+  api.getDocument.mockRejectedValueOnce(new Error('still down'));
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getByRole('button', { name: /accept/i }));
+  await userEvent.click(screen.getByRole('button', { name: /accept/i }));
+  await userEvent.click(screen.getByRole('button', { name: /confirm & save \(1\)/i }));
+  await waitFor(() => expect(screen.getByText(/network down/i)).toBeInTheDocument());
+  expect(screen.getByText(/Term is 12 months/)).toBeInTheDocument(); // view intact
+});
+
+test('confirm surfaces a notice when an accepted change came back stale', async () => {
+  api.getDocument.mockResolvedValue(detail());
+  api.confirmSuggestions.mockResolvedValue(detail({
+    suggestions: [{ ...detail().suggestions[0], status: 'stale' }],
+  }));
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getByRole('button', { name: /accept/i }));
+  await userEvent.click(screen.getByRole('button', { name: /accept/i }));
+  await userEvent.click(screen.getByRole('button', { name: /confirm & save \(1\)/i }));
+  await waitFor(() =>
+    expect(screen.getByText(/1 accepted change could not be applied/i)).toBeInTheDocument(),
+  );
+});
+
 test('rejected suggestion stays visible as dismissed', async () => {
   api.getDocument.mockResolvedValue(detail({
     suggestions: [{ ...detail().suggestions[0], status: 'rejected' }],

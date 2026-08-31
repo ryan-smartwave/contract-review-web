@@ -38,7 +38,8 @@ export function SuggestionCard({
             Accept
           </Button>
           <Button
-            variant={staged === 'reject' ? 'primary' : 'secondary'}
+            variant="secondary"
+            className={staged === 'reject' ? 'border-danger text-danger' : ''}
             aria-pressed={staged === 'reject'}
             onClick={() => onStage('reject')}
             disabled={busy}

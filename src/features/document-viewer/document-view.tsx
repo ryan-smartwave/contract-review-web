@@ -55,8 +55,9 @@ export function DocumentView({ documentId }: { documentId: number }) {
   const [detail, setDetail] = useState<DocumentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<'review' | 'original'>('review');
-  const [staged, setStaged] = useState<Record<number, StagedChoice>>({});
+  const [staged, setStaged] = useState<Record<number, Exclude<StagedChoice, null>>>({});
 
   useEffect(() => {
     getDocument(documentId).then(setDetail).catch((e) =>
@@ -64,26 +65,55 @@ export function DocumentView({ documentId }: { documentId: number }) {
   }, [documentId]);
 
   const stage = useCallback((id: number, choice: 'accept' | 'reject') => {
-    setStaged((prev) => ({ ...prev, [id]: prev[id] === choice ? null : choice }));
+    setStaged((prev) => {
+      const next = { ...prev };
+      if (next[id] === choice) delete next[id];
+      else next[id] = choice;
+      return next;
+    });
   }, []);
 
-  const stagedEntries = Object.entries(staged).filter(([, choice]) => choice !== null);
+  const stagedEntries = Object.entries(staged);
 
   const confirm = useCallback(async () => {
-    const appliedIds = stagedEntries.filter(([, c]) => c === 'accept').map(([id]) => Number(id));
-    const rejectedIds = stagedEntries.filter(([, c]) => c === 'reject').map(([id]) => Number(id));
+    const appliedIds = Object.entries(staged).filter(([, c]) => c === 'accept').map(([id]) => Number(id));
+    const rejectedIds = Object.entries(staged).filter(([, c]) => c === 'reject').map(([id]) => Number(id));
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
-      setDetail(await confirmSuggestions(documentId, appliedIds, rejectedIds));
+      const fresh = await confirmSuggestions(documentId, appliedIds, rejectedIds);
+      setDetail(fresh);
       setStaged({});
+      const staleCount = appliedIds.filter((id) =>
+        fresh.suggestions.some((s) => s.id === id && s.status === 'stale'),
+      ).length;
+      if (staleCount > 0) {
+        setNotice(
+          `${staleCount} accepted change${staleCount === 1 ? '' : 's'} could not be applied because the document text had changed.`,
+        );
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Action failed');
-      setDetail(await getDocument(documentId));
+      try {
+        const fresh = await getDocument(documentId);
+        setDetail(fresh);
+        // drop staged decisions for suggestions actioned elsewhere, so a
+        // retry doesn't resend ids the server will always refuse
+        setStaged((prev) =>
+          Object.fromEntries(
+            Object.entries(prev).filter(([id]) =>
+              fresh.suggestions.some((s) => s.id === Number(id) && s.status === 'pending'),
+            ),
+          ),
+        );
+      } catch {
+        // refetch failed too — keep the current view, the error is already shown
+      }
     } finally {
       setBusy(false);
     }
-  }, [documentId, stagedEntries]);
+  }, [documentId, staged]);
 
   if (error && !detail) return <EmptyState title="Could not load document" description={error} />;
   if (!detail) return <p className="text-sm text-text-muted">Loading…</p>;
@@ -101,6 +131,7 @@ export function DocumentView({ documentId }: { documentId: number }) {
         )}
       </div>
       {error && <p className="text-sm text-danger">{error}</p>}
+      {notice && <p className="text-sm text-warning">{notice}</p>}
       <div className="flex gap-1 border-b border-border" role="tablist">
         {([['review', 'Review'], ['original', 'Original document']] as const).map(([key, label]) => (
           <button
