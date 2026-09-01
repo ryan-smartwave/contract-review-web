@@ -287,3 +287,55 @@ test('comparison tab shows the failed empty state', async () => {
     expect(screen.getByText(/comparison unavailable/i)).toBeInTheDocument(),
   );
 });
+
+test('comparison tab is hidden when the document is not a contract revision', async () => {
+  api.getDocument.mockResolvedValue(detail({ is_contract_revision: false }));
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => expect(screen.getByText(/Term is 12 months/)).toBeInTheDocument());
+  expect(screen.queryByRole('tab', { name: /compared with prior/i })).not.toBeInTheDocument();
+});
+
+test('comparison tab shows an in-progress message while pending', async () => {
+  api.getDocument.mockResolvedValue(detail());
+  api.getComparison.mockResolvedValue(comparison({
+    status: 'pending', matched_document: null, summary: null, changes: [],
+  }));
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getByRole('tab', { name: /compared with prior/i }));
+  await userEvent.click(screen.getByRole('tab', { name: /compared with prior/i }));
+  await waitFor(() =>
+    expect(screen.getByText(/comparison in progress/i)).toBeInTheDocument(),
+  );
+});
+
+test('a removed change renders a change card but highlights nothing in the document text', async () => {
+  api.getDocument.mockResolvedValue(detail());
+  api.getComparison.mockResolvedValue(comparison({
+    changes: [
+      {
+        kind: 'removed' as const, clause: 'Renewal',
+        before_text: 'Auto-renews annually.', after_text: null,
+        note: 'Auto-renewal removed.',
+      },
+    ],
+  }));
+  const { container } = render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getByRole('tab', { name: /compared with prior/i }));
+  await userEvent.click(screen.getByRole('tab', { name: /compared with prior/i }));
+  await waitFor(() => expect(screen.getByText('Auto-renewal removed.')).toBeInTheDocument());
+  expect(screen.getByText('removed')).toBeInTheDocument();
+  // removed changes have no after_text, so nothing on the comparison tab is
+  // wrapped in <ins> — suggestion redlines don't render on this tab either
+  expect(container.querySelector('ins')).toBeNull();
+});
+
+test('comparison tab shows the failed empty state when getComparison rejects', async () => {
+  api.getDocument.mockResolvedValue(detail());
+  api.getComparison.mockRejectedValue(new Error('network down'));
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getByRole('tab', { name: /compared with prior/i }));
+  await userEvent.click(screen.getByRole('tab', { name: /compared with prior/i }));
+  await waitFor(() =>
+    expect(screen.getByText(/comparison unavailable/i)).toBeInTheDocument(),
+  );
+});

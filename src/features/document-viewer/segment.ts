@@ -1,5 +1,7 @@
 export type Segment<T> = string | { item: T };
 
+export const INS_HIGHLIGHT_CLASS = 'rounded bg-success/10 px-0.5 text-success decoration-success/60';
+
 /** Split text on each item's anchor. Pass items sorted longest-anchor-first
  *  so a shorter anchor can't split inside a longer one. */
 export function segment<T>(

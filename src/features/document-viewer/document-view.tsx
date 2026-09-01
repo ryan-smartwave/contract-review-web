@@ -10,7 +10,7 @@ import { confirmSuggestions, getComparison, getDocument, versionFileUrl } from '
 import type { Comparison, DocumentDetail, Suggestion } from '@/types/api';
 import { SuggestionCard, type StagedChoice } from './suggestion-card';
 import { ChangeCard, ComparisonText } from './comparison-view';
-import { segment } from './segment';
+import { INS_HIGHLIGHT_CLASS, segment } from './segment';
 
 // pdf.js touches browser-only globals; never render this on the server
 const OriginalDocument = dynamic(() => import('./original-document'), {
@@ -27,7 +27,7 @@ function redline(text: string, pending: Suggestion[]) {
         <del className="rounded bg-danger/10 px-0.5 text-danger decoration-danger/60">
           {seg.item.original_text}
         </del>{' '}
-        <ins className="rounded bg-success/10 px-0.5 text-success decoration-success/60">
+        <ins className={INS_HIGHLIGHT_CLASS}>
           {seg.item.replacement_text}
         </ins>
       </span>
@@ -131,7 +131,13 @@ export function DocumentView({ documentId }: { documentId: number }) {
       {error && <p className="text-sm text-danger">{error}</p>}
       {notice && <p className="text-sm text-warning">{notice}</p>}
       <div className="flex gap-1 border-b border-border" role="tablist">
-        {([['review', 'Review'], ['original', 'Original document'], ['comparison', 'Compared with prior']] as const).map(([key, label]) => (
+        {(
+          [
+            ['review', 'Review'],
+            ['original', 'Original document'],
+            ...(detail.is_contract_revision ? [['comparison', 'Compared with prior'] as const] : []),
+          ] satisfies Array<readonly ['review' | 'original' | 'comparison', string]>
+        ).map(([key, label]) => (
           <button
             key={key}
             role="tab"
