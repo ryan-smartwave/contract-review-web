@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { confirmSuggestions, getDocument, versionFileUrl } from '@/lib/api';
 import type { DocumentDetail, Suggestion } from '@/types/api';
 import { SuggestionCard, type StagedChoice } from './suggestion-card';
+import { segment } from './segment';
 
 // pdf.js touches browser-only globals; never render this on the server
 const OriginalDocument = dynamic(() => import('./original-document'), {
@@ -16,31 +17,17 @@ const OriginalDocument = dynamic(() => import('./original-document'), {
   loading: () => <p className="text-sm text-text-muted">Rendering document…</p>,
 });
 
-type Segment = string | { suggestion: Suggestion };
-
-function segment(text: string, pending: Suggestion[]): Segment[] {
-  let segments: Segment[] = [text];
-  for (const suggestion of pending) {
-    segments = segments.flatMap((seg) => {
-      if (typeof seg !== 'string' || !seg.includes(suggestion.original_text)) return [seg];
-      const [before, ...rest] = seg.split(suggestion.original_text);
-      return [before, { suggestion }, rest.join(suggestion.original_text)];
-    });
-  }
-  return segments;
-}
-
 function redline(text: string, pending: Suggestion[]) {
-  return segment(text, pending).map((seg, i) =>
+  return segment(text, pending, (s) => s.original_text).map((seg, i) =>
     typeof seg === 'string' ? (
       <span key={i}>{seg}</span>
     ) : (
       <span key={i}>
         <del className="rounded bg-danger/10 px-0.5 text-danger decoration-danger/60">
-          {seg.suggestion.original_text}
+          {seg.item.original_text}
         </del>{' '}
         <ins className="rounded bg-success/10 px-0.5 text-success decoration-success/60">
-          {seg.suggestion.replacement_text}
+          {seg.item.replacement_text}
         </ins>
       </span>
     ),
