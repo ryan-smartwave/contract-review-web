@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
-import { confirmSuggestions, getDocument, versionFileUrl } from '@/lib/api';
-import type { DocumentDetail, Suggestion } from '@/types/api';
+import { confirmSuggestions, getComparison, getDocument, versionFileUrl } from '@/lib/api';
+import type { Comparison, DocumentDetail, Suggestion } from '@/types/api';
 import { SuggestionCard, type StagedChoice } from './suggestion-card';
+import { ChangeCard, ComparisonText } from './comparison-view';
 import { segment } from './segment';
 
 // pdf.js touches browser-only globals; never render this on the server
@@ -43,8 +44,9 @@ export function DocumentView({ documentId }: { documentId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [tab, setTab] = useState<'review' | 'original'>('review');
+  const [tab, setTab] = useState<'review' | 'original' | 'comparison'>('review');
   const [staged, setStaged] = useState<Record<number, Exclude<StagedChoice, null>>>({});
+  const [comparisonData, setComparisonData] = useState<Comparison | null>(null);
 
   useEffect(() => {
     getDocument(documentId).then(setDetail).catch((e) =>
@@ -61,6 +63,15 @@ export function DocumentView({ documentId }: { documentId: number }) {
   }, []);
 
   const stagedEntries = Object.entries(staged);
+
+  const openTab = useCallback((key: 'review' | 'original' | 'comparison') => {
+    setTab(key);
+    if (key === 'comparison' && comparisonData === null) {
+      getComparison(documentId)
+        .then(setComparisonData)
+        .catch(() => setComparisonData({ status: 'failed', matched_document: null, summary: null, changes: [] }));
+    }
+  }, [comparisonData, documentId]);
 
   const confirm = useCallback(async () => {
     const appliedIds = Object.entries(staged).filter(([, c]) => c === 'accept').map(([id]) => Number(id));
@@ -120,12 +131,12 @@ export function DocumentView({ documentId }: { documentId: number }) {
       {error && <p className="text-sm text-danger">{error}</p>}
       {notice && <p className="text-sm text-warning">{notice}</p>}
       <div className="flex gap-1 border-b border-border" role="tablist">
-        {([['review', 'Review'], ['original', 'Original document']] as const).map(([key, label]) => (
+        {([['review', 'Review'], ['original', 'Original document'], ['comparison', 'Compared with prior']] as const).map(([key, label]) => (
           <button
             key={key}
             role="tab"
             aria-selected={tab === key}
-            onClick={() => setTab(key)}
+            onClick={() => openTab(key)}
             className={`-mb-px rounded-t-md border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
               tab === key
                 ? 'border-primary text-primary'
@@ -137,7 +148,9 @@ export function DocumentView({ documentId }: { documentId: number }) {
         ))}
       </div>
       <div className="grid gap-6 md:grid-cols-[1fr_340px]">
-        {tab === 'review' ? (
+        {tab === 'comparison' ? (
+          <ComparisonText text={detail.text} comparison={comparisonData} />
+        ) : tab === 'review' ? (
           <Card className="px-8 py-10 font-serif text-[15px] leading-7 sm:px-12">
             {detail.text
               ? detail.text.split(/\n{2,}/).map((paragraph, i) => (
@@ -159,29 +172,44 @@ export function DocumentView({ documentId }: { documentId: number }) {
           </Card>
         )}
         <div className="flex flex-col gap-3">
-          <p className="text-sm font-semibold">Suggested redlines ({detail.suggestions.length})</p>
-          {detail.suggestions.length === 0 && (
-            <p className="text-sm text-text-muted">No suggestions for this document.</p>
+          {tab !== 'comparison' && (
+            <>
+              <p className="text-sm font-semibold">Suggested redlines ({detail.suggestions.length})</p>
+              {detail.suggestions.length === 0 && (
+                <p className="text-sm text-text-muted">No suggestions for this document.</p>
+              )}
+              {detail.suggestions.map((s) => (
+                <SuggestionCard
+                  key={s.id}
+                  suggestion={s}
+                  busy={busy}
+                  staged={staged[s.id] ?? null}
+                  onStage={(choice) => stage(s.id, choice)}
+                />
+              ))}
+              {stagedEntries.length > 0 && (
+                <div className="sticky bottom-4 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-raised p-3 shadow-md">
+                  <p className="text-sm text-text-muted">
+                    {stagedEntries.filter(([, c]) => c === 'accept').length} accepted ·{' '}
+                    {stagedEntries.filter(([, c]) => c === 'reject').length} rejected
+                  </p>
+                  <Button onClick={confirm} disabled={busy}>
+                    Confirm &amp; save ({stagedEntries.length})
+                  </Button>
+                </div>
+              )}
+            </>
           )}
-          {detail.suggestions.map((s) => (
-            <SuggestionCard
-              key={s.id}
-              suggestion={s}
-              busy={busy}
-              staged={staged[s.id] ?? null}
-              onStage={(choice) => stage(s.id, choice)}
-            />
-          ))}
-          {stagedEntries.length > 0 && (
-            <div className="sticky bottom-4 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-raised p-3 shadow-md">
-              <p className="text-sm text-text-muted">
-                {stagedEntries.filter(([, c]) => c === 'accept').length} accepted ·{' '}
-                {stagedEntries.filter(([, c]) => c === 'reject').length} rejected
-              </p>
-              <Button onClick={confirm} disabled={busy}>
-                Confirm &amp; save ({stagedEntries.length})
-              </Button>
-            </div>
+          {tab === 'comparison' && comparisonData?.status === 'ready' && (
+            <>
+              <p className="text-sm font-semibold">Changes vs prior ({comparisonData.changes.length})</p>
+              {comparisonData.changes.length === 0 && (
+                <p className="text-sm text-text-muted">No verifiable changes to highlight.</p>
+              )}
+              {comparisonData.changes.map((c, i) => (
+                <ChangeCard key={i} change={c} />
+              ))}
+            </>
           )}
           <p className="mt-2 text-sm font-semibold">Versions</p>
           <ul className="flex flex-col gap-1 text-sm text-text-muted">

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 import type { DocumentDetail } from '@/types/api';
 
-const api = { getDocument: vi.fn(), confirmSuggestions: vi.fn() };
+const api = { getDocument: vi.fn(), confirmSuggestions: vi.fn(), getComparison: vi.fn() };
 vi.mock('./original-document', () => ({
   default: () => <div>ORIGINAL DOC RENDER</div>,
 }));
@@ -11,6 +11,7 @@ vi.mock('./original-document', () => ({
 vi.mock('@/lib/api', () => ({
   getDocument: (...a: unknown[]) => api.getDocument(...a),
   confirmSuggestions: (...a: unknown[]) => api.confirmSuggestions(...a),
+  getComparison: (...a: unknown[]) => api.getComparison(...a),
   versionFileUrl: (documentId: number, versionNumber: number) =>
     `http://localhost:8000/documents/${documentId}/versions/${versionNumber}/file`,
 }));
@@ -226,4 +227,63 @@ test('paragraph breaks render as separate blocks with title styling', async () =
   const paras = container.querySelectorAll('[data-doc-paragraph]');
   expect(paras.length).toBe(3);
   expect(screen.getByText('MASTER SERVICES AGREEMENT').closest('p')?.className).toContain('font-semibold');
+});
+
+const comparison = (over: Partial<import('@/types/api').Comparison> = {}) => ({
+  status: 'ready' as const,
+  matched_document: { id: 3, filename: 'msa-2025.pdf', detected_at: '2026-08-01T00:00:00Z' },
+  summary: 'Liability cap added; term unchanged.',
+  changes: [
+    {
+      kind: 'modified' as const, clause: 'Liability',
+      before_text: 'Liability is unlimited.', after_text: 'Liability is unlimited.',
+      note: 'Cap introduced.',
+    },
+  ],
+  ...over,
+});
+
+test('comparison tab fetches lazily and renders summary, highlight, and change card', async () => {
+  api.getDocument.mockResolvedValue(detail());
+  api.getComparison.mockResolvedValue(comparison());
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getByRole('tab', { name: /compared with prior/i }));
+  expect(api.getComparison).not.toHaveBeenCalled(); // lazy
+  await userEvent.click(screen.getByRole('tab', { name: /compared with prior/i }));
+  await waitFor(() => expect(screen.getByText(/Liability cap added/)).toBeInTheDocument());
+  expect(api.getComparison).toHaveBeenCalledWith(1);
+  expect(screen.getByText(/msa-2025\.pdf/)).toBeInTheDocument();
+  // after_text is highlighted inside the document text as an <ins>
+  expect(screen.getByText('Liability is unlimited.', { selector: 'ins' })).toBeInTheDocument();
+  // change card in the right column with kind badge and note
+  expect(screen.getByText('Cap introduced.')).toBeInTheDocument();
+  expect(screen.getByText('modified')).toBeInTheDocument();
+  // suggestion cards are swapped out while on this tab
+  expect(screen.queryByRole('button', { name: /accept/i })).not.toBeInTheDocument();
+});
+
+test('comparison tab shows the no-match empty state', async () => {
+  api.getDocument.mockResolvedValue(detail());
+  api.getComparison.mockResolvedValue(comparison({
+    status: 'no_match', matched_document: null, summary: null, changes: [],
+  }));
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getByRole('tab', { name: /compared with prior/i }));
+  await userEvent.click(screen.getByRole('tab', { name: /compared with prior/i }));
+  await waitFor(() =>
+    expect(screen.getByText(/no similar contract found/i)).toBeInTheDocument(),
+  );
+});
+
+test('comparison tab shows the failed empty state', async () => {
+  api.getDocument.mockResolvedValue(detail());
+  api.getComparison.mockResolvedValue(comparison({
+    status: 'failed', matched_document: null, summary: null, changes: [],
+  }));
+  render(<DocumentView documentId={1} />);
+  await waitFor(() => screen.getByRole('tab', { name: /compared with prior/i }));
+  await userEvent.click(screen.getByRole('tab', { name: /compared with prior/i }));
+  await waitFor(() =>
+    expect(screen.getByText(/comparison unavailable/i)).toBeInTheDocument(),
+  );
 });
