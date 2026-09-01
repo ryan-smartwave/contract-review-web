@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { confirmDriveFile, confirmSuggestions, listDocuments, searchDrive, uploadContract } from './api';
+import { confirmDriveFile, confirmSuggestions, getComparison, listDocuments, searchDrive, uploadContract } from './api';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -46,4 +46,17 @@ test('confirmDriveFile posts file identity', async () => {
     mime_type: 'application/vnd.google-apps.document', web_view_link: null,
   });
   expect(doc.id).toBe(9);
+});
+
+test('getComparison fetches the comparison for a document', async () => {
+  mockFetch(200, {
+    status: 'ready',
+    matched_document: { id: 3, filename: 'msa-2025.pdf', detected_at: '2026-08-01T00:00:00Z' },
+    summary: 'Term doubled.',
+    changes: [{ kind: 'modified', clause: 'Term', before_text: 'a', after_text: 'b', note: 'n' }],
+  });
+  const comparison = await getComparison(7);
+  expect(comparison.status).toBe('ready');
+  expect(comparison.changes[0].clause).toBe('Term');
+  expect(vi.mocked(fetch).mock.calls[0][0]).toContain('/documents/7/comparison');
 });

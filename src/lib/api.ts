@@ -1,4 +1,4 @@
-import type { DocumentOut, DocumentDetail, DriveFile, DriveSearch } from '@/types/api';
+import type { DocumentOut, DocumentDetail, DriveFile, DriveSearch, Comparison } from '@/types/api';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -53,4 +53,8 @@ export function confirmDriveFile(file: DriveFile): Promise<DocumentOut> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ file_id: file.file_id, name: file.name, mime_type: file.mime_type }),
   });
+}
+
+export function getComparison(documentId: number): Promise<Comparison> {
+  return request(`/documents/${documentId}/comparison`);
 }

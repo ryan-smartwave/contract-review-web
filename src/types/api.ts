@@ -44,3 +44,18 @@ export type DriveSearch = {
   results: DriveFile[];
   clarifying_question: string | null;
 };
+
+export type ComparisonChange = {
+  kind: 'added' | 'removed' | 'modified';
+  clause: string;
+  before_text: string | null;
+  after_text: string | null;
+  note: string;
+};
+
+export type Comparison = {
+  status: 'pending' | 'ready' | 'no_match' | 'failed';
+  matched_document: { id: number; filename: string; detected_at: string } | null;
+  summary: string | null;
+  changes: ComparisonChange[];
+};
